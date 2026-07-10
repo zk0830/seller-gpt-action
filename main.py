@@ -1,5 +1,6 @@
 import os
-from typing import Optional
+from typing import Optional, List
+import asyncio
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
@@ -13,9 +14,9 @@ XIYOU_API_KEY = os.getenv("XIYOU_API_KEY")
 XIYOU_BASE_URL = "https://openapi.xydc.com"
 
 
-class AsinRequest(BaseModel):
+class AsinsRequest(BaseModel):
     marketplace: str
-    asin: str
+    asins: List[str]
     size: int = 10
 
 
@@ -203,4 +204,30 @@ async def asin_deep_dive(
             "暂未接入 PPC 竞价",
             "暂未接入月度关键词反查"
         ]
+    }
+@app.post("/asins/deep-dive")
+async def asins_deep_dive(
+    req: AsinsRequest,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
+    if x_api_key != GPT_ACTION_KEY:
+        raise HTTPException(status_code=401, detail="API Key 错误")
+
+    results = []
+
+    for asin in req.asins[:10]:
+        data = await asin_deep_dive(
+            AsinRequest(
+                marketplace=req.marketplace,
+                asin=asin,
+                size=req.size
+            ),
+            x_api_key
+        )
+        results.append(data)
+
+    return {
+        "ok": True,
+        "count": len(results),
+        "results": results
     }
